@@ -1,0 +1,146 @@
+﻿<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>京东自动领金豆</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" type="text/css" href="./static/bootstrap-3.3.7-dist/css/bootstrap.min.css">
+    <link rel="stylesheet" type="text/css" href="./static/jd/css/common.css">
+    <style>
+        .table>thead>tr>th {
+            word-break: keep-all;
+        }
+    </style>
+    <!-- jquery -->
+    <script src="https://cdn.bootcdn.net/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <!-- bootstrap -->
+    <script src="./static/bootstrap-3.3.7-dist/js/bootstrap.min.js"></script>
+    <!-- momentjs -->
+    <script src="https://cdn.bootcdn.net/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+
+    <script type="text/javascript" src="./static/jd/js/common.js?v=1.0.4"></script>
+    <script type="text/javascript" src="./static/jd/js/apis.js?v=1.0.4"></script>
+
+    <script type="text/javascript">
+        window.isloading = false;
+        window.pageIndex = 1;
+
+        function redirect() {
+            window.location = 'user-verif.html';
+        }
+
+        $(function() {
+            // $('#myModal').modal('toggle');
+            $('#myModal .modal-body').scroll(function(e) {
+                var isButtom = isScrollToButtom(this);
+                if (isButtom && !isloading) loadMore();
+            });
+            if (localStorage.JD_Api_Access_Pt_Pin) {
+                $('#viewRecords').show();
+                loadMore();
+            }
+        })
+
+        //加载更多
+        function loadMore() {
+            isloading = true;
+            $('.loading').show();
+            loadPageData(function(resp) {
+                $('#tbHistory').append(resp);
+                isloading = false;
+            });
+        }
+
+        //获取分页数据
+        function loadPageData(callback) {
+            api.GetUserTaskRecords(pageIndex, 10, function(apiRes) {
+                console.info('apiRes', pageIndex, apiRes)
+                if (apiRes.code >= 0) {
+                    var data = apiRes.data;
+                    if (data && data.rows.length > 0) {
+                        pageIndex++;
+                        //
+                        var rowIndex = $('#tbHistory').find('tr').length;
+                        var html = '';
+                        var rows = data.rows;
+                        $.each(rows, function(idx, row) {
+                            var taskTime = moment(new Date(row.taskTime)).format(shortTimeFormat);
+                            var jdBeans = row.jdBeans > 0 ? row.jdBeans : 0;
+                            var jdSteels = row.jdSteels > 0 ? row.jdSteels : 0;
+                            var jdGolds = row.jdGolds > 0 ? row.jdGolds : 0;
+                            var jdCashes = row.jdCashes > 0 ? row.jdCashes : 0;
+                            html += '<tr><th scope="row">' + (rowIndex + idx + 1) + '</th><td>' + taskTime + '</td><td>' + jdBeans + '</td><td>' + jdSteels + '</td><td>' + jdGolds + '</td><td>' + jdCashes + '</td></tr>';
+                        })
+                        callback(html);
+                    } else {
+                        $('.loading').hide();
+                    }
+                } else {
+                    alert('请求接口失败：' + apiRes.message);
+                }
+            });
+        }
+
+        //是否滚动到底部
+        function isScrollToButtom(target) {
+            return (target.scrollTop + target.clientHeight + 50) >= target.scrollHeight;
+        }
+    </script>
+</head>
+
+<body>
+    <div>
+        <div class="t1">
+            <h3>京东自动领金豆 <img style="padding-bottom: 5px; width: 16px;" src="https://m.360buyimg.com/njmobilecms/jfs/t23077/281/1785113494/12232/1b2c8fe2/5b699736N9a079de0.png" /></h3>
+            <p>当前程序仅学习用途，请勿传播。</p>
+            <p>如有疑问，可加微信咨询：keroroqingwa（备注：领京豆）。</p>
+        </div>
+        <div class="footer">
+            <button type="button" class="btn btn-success" style="padding:10px 50px;" onclick="redirect()">开始</button>
+            <div id="viewRecords" style="padding-top:20px;display: none;" aria-hidden="true" data-toggle="modal" data-target="#myModal">
+                <a>查看领取记录</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- 领取记录 -->
+    <div class="modal fade" id="myModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+        <div class="modal-dialog modal-sm" role="document" style="margin-top:50px;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    <h4 class="modal-title" id="myModalLabel">领取记录</h4>
+                </div>
+                <div class="modal-body" style="height:400px;overflow:scroll;">
+                    <!-- <p><span class="glyphicon glyphicon-menu-right" aria-hidden="true"></span> 当前脚本功能包含：领取京豆、钢镚、金贴、现金红包。</p>
+                    <p><span class="glyphicon glyphicon-menu-right" aria-hidden="true"></span> 京豆、钢镚、金贴、现金红包 均有有效期限制，即会过期，注意使用。</p>
+                    <p><span class="glyphicon glyphicon-menu-right" aria-hidden="true"></span> 当前脚本只需每天执行一次即可，不用频繁重复地执行。</p>
+                    <p><span class="glyphicon glyphicon-menu-right" aria-hidden="true"></span> 如果执行结果中出现如“xx京豆”，这是表示京东那边未返回具体的京豆数值，所以用xx代替。</p> -->
+                    <div>
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>日期</th>
+                                    <th>京豆</th>
+                                    <th>钢镚</th>
+                                    <th>金贴</th>
+                                    <th>红包</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbHistory"></tbody>
+                        </table>
+                        <div class="loading" style="text-align:center;display: none;"><span class="glyphicon glyphicon-refresh rotating"></span> loading...</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+
+</html>

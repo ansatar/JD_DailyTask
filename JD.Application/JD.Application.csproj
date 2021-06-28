@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net5.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AutoMapper" Version="10.1.1" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="5.0.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\JD.Core\JD.Core.csproj" />
+    <ProjectReference Include="..\JD.EntityFrameworkCore\JD.EntityFrameworkCore.csproj" />
+    <ProjectReference Include="..\JD_Utils\JD.Utils.csproj" />
+  </ItemGroup>
+
+</Project>

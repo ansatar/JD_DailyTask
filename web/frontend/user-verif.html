@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>授权登录</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" type="text/css" href="./static/bootstrap-3.3.7-dist/css/bootstrap.min.css">
+    <link rel="stylesheet" type="text/css" href="./static/jd/css/common.css">
+    <!-- jquery -->
+    <script src="https://cdn.bootcdn.net/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <!-- jquery.qrcode -->
+    <script src="https://cdn.bootcdn.net/ajax/libs/jquery.qrcode/1.0/jquery.qrcode.min.js"></script>
+    <!-- momentjs -->
+    <script src="https://cdn.bootcdn.net/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+    <!-- loader -->
+    <script src="./static/jd/js/loader.js?v=1.0.4"></script>
+
+    <script type="text/javascript" src="./static/jd/js/common.js?v=1.0.4"></script>
+    <script type="text/javascript" src="./static/jd/js/auth-api.js?v=1.0.4"></script>
+    <script type="text/javascript" src="./static/jd/js/apis.js?v=1.0.4"></script>
+
+    <script type="text/javascript">
+        // window.history.pushState(null, null, 'index.html'); // url指向首页
+        window.qrExpiresTime = 120; //二维码过期时间（秒）
+        window.curTimes = 0; //当前二维码生成时间（秒）
+        window.jd_user_data; //用户信息
+
+        function redirect() {
+            var chkSaveLogin = $('#chkSaveLogin').prop('checked');
+            loader.show();
+            var user = window.jd_user_data;
+            savePtPinStorage(user.base.curPin); //本地存储用户的pt_pin
+
+            //是否保存登录信息，并一个月内每天自动执行脚本
+            if (!chkSaveLogin) window.location = 'get-bonus.html';
+            else {
+                //新增/更新 用户基本信息
+                var params = {
+                    "curPin": user.base.curPin,
+                    "headImageUrl": user.base.headImageUrl,
+                    "jdNum": user.base.jdNum,
+                    "levelName": user.base.levelName,
+                    "mobile": user.base.mobile,
+                    "nickname": user.base.nickname,
+                    "cookie": localStorage.JD_Api_Access_Cookies,
+                    "lastLoginTime": moment(new Date(localStorage.JD_Api_Access_Cookies_LoginTime)).format(),
+                    "isEnabledAutoTask": true
+                };
+                api.CreateOrUpdateUser(params, function(apiRes) {
+                    console.info('apiRes', apiRes)
+                    if (apiRes.code >= 0) {
+                        window.location = 'get-bonus.html?isEnabledAutoTask=true';
+                    } else {
+                        alert('请求接口失败：' + apiRes.message);
+                    }
+                });
+            }
+        }
+
+        $(function() {
+            if (isLogined()) {
+                $('#nologin').hide();
+                $('#logined').show();
+                // 获取账户京豆信息
+                QueryJDUserInfo(localStorage.JD_Api_Access_Cookies);
+            } else {
+                $('#nologin').show();
+                $('#logined').hide();
+                // 获取相关的登录参数并显示二维码
+                GetLoginParams();
+            }
+            //重新获取二维码（刷新页面）
+            $('#reLoadQRCode').click(function() {
+                window.location = 'user-verif.html';
+            });
+        });
+
+        // 获取相关的登录参数并显示二维码
+        function GetLoginParams() {
+            loader.show();
+            api.GetLoginParams(function(apiRes) {
+                console.info('apiRes', apiRes)
+                if (apiRes.code >= 0) {
+                    var data = apiRes.data;
+                    if (data.qrcodeUrl) {
+                        $('#qrcode').qrcode(data.qrcodeUrl);
+                        //检查是否登录成功
+                        setInterval(function() {
+                            if (!isLogined() && window.curTimes < window.qrExpiresTime) {
+                                CheckLogin(data.cookies, data.token, data.okl_Token);
+                            }
+                        }, 1000 * 1);
+                    } else {
+                        alert('登录二维码获取失败，请刷新页面重试！');
+                    }
+                } else {
+                    alert('请求接口失败：' + apiRes.message);
+                }
+                loader.hide();
+            });
+        }
+
+        // 检查是否登录成功
+        function CheckLogin(cookies, token, okl_token) {
+            api.CheckLogin(cookies, token, okl_token, function(apiRes) {
+                console.info('CheckLogin', apiRes);
+                timesLoop();
+                if (apiRes.code >= 0) {
+                    var data = apiRes.data;
+                    //本地登录缓存
+                    saveLoginStorage(data.cookie);
+                    //获取账户京豆信息
+                    QueryJDUserInfo(data.cookie);
+                } else {
+                    //alert('请求接口失败：' + apiRes.message);
+                }
+                loader.hide();
+            });
+        }
+
+        // 获取账户京豆信息
+        function QueryJDUserInfo(cookies) {
+            loader.show();
+            api.QueryJDUserInfo(cookies, function(apiRes) {
+                console.info('QueryJDUserInfo', apiRes);
+                if (apiRes.code >= 0) {
+                    var data = apiRes.data;
+                    window.jd_user_data = data;
+
+                    $('#txtUsername').text(data.base.curPin);
+                    $('#txtNickname').text(data.base.nickname);
+                    $('#txtMobile').text(data.base.mobile);
+                    $('#txtLevelName').text(data.base.levelName);
+                    $('#txtjdNum').text(data.base.jdNum);
+
+                    $('#nologin').hide();
+                    $('#logined').show();
+                    $('#expLoginTime').text(moment(new Date(localStorage.JD_Api_Access_Cookies_Expires)).format('YYYY-MM-DD'));
+                    $('#lastLoginTime').text(localStorage.JD_Api_Access_Cookies_LoginTime);
+                    loader.hide();
+                } else {
+                    alert('请求接口失败：' + apiRes.message);
+                }
+                loader.hide();
+            });
+        }
+
+        // 重新登录
+        function relogin() {
+            removeLoginStorage();
+            window.location = 'user-verif.html';
+        }
+
+        // 计算二维码生成时间（秒）
+        function timesLoop() {
+            window.curTimes++;
+            // $('#timescount').html(window.curTimes);
+            if (window.curTimes >= window.qrExpiresTime) {
+                $('#reLoadQRCode').show();
+            }
+        }
+    </script>
+</head>
+
+<body>
+    <div>
+        <!-- 未进行扫码登录授权 -->
+        <div class="t1" id="nologin" style="display: none;">
+            <h3>需要先进行登录授权</h3>
+            <div id="qrcode">
+                <div id="reLoadQRCode" style="position: absolute;width: 100%;left:0;margin-top:-10px;height: 316px;background-color: #666; color:#fff;opacity: 0.9; text-align: center; display: none;">
+                    <span class="glyphicon glyphicon-refresh" style="padding-top: 130px; font-size: 2em;"></span>
+                    <p>重新获取二维码</p>
+                </div>
+            </div>
+            <p>按以下步骤操作：</p>
+            <ul>
+                <li style="color:#ff0000;">0. 不要关闭本页面！不要退出本页面！</li>
+                <li>1. 截图当前页面并保存（二维码有效期为2分钟，过期后要刷新本页面）</li>
+                <li>2. 打开京东APP，扫一扫，选择当前截图</li>
+                <li>3. 完成以上操作后切换回当前页面即可</li>
+            </ul>
+        </div>
+
+        <!-- 已扫码登录授权 -->
+        <div class="t1" id="logined" style="display: none;">
+            <h3>你已通过京豆APP授权登录</h3>
+            <p>基本信息：</p>
+            <ul>
+                <li>username：<span id="txtUsername">--</span></li>
+                <li>nickname：<span id="txtNickname">--</span></li>
+                <li>mobile：<span id="txtMobile">--</span></li>
+                <li>levelName：<span id="txtLevelName">--</span></li>
+                <li>京豆：<span id="txtjdNum" class="label label-warning">--</span></li>
+            </ul>
+            <div class="checkbox">
+                <label style="color:#337ab7;">
+                  <input id="chkSaveLogin" type="checkbox" checked> 保存登录信息，并一个月内每天自动执行脚本
+                </label>
+            </div>
+            <button type="button" class="btn btn-success" style="padding:10px 50px; margin-top: 10px;" onclick="redirect()">开始领京豆</button>
+            <p style="padding:15px 0;">登录信息将在 <span id="expLoginTime">--</span> 过期，你可以<a href="javascript:;" onclick="relogin()">重新登录</a></p>
+            <div style="bottom: 0;position: absolute;color: #ccc;">
+                <p>上次登录时间：<span id="lastLoginTime">--</span></p>
+            </div>
+        </div>
+
+        <!-- <p id="timescount"></p> -->
+    </div>
+
+</body>
+
+</html>

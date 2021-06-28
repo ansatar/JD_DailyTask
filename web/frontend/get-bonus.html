@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>京东自动领金豆</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" type="text/css" href="./static/bootstrap-3.3.7-dist/css/bootstrap.min.css">
+    <link rel="stylesheet" type="text/css" href="./static/jd/css/common.css">
+    <style>
+        ul li {
+            line-height: 26px;
+            list-style: decimal;
+        }
+    </style>
+    <!-- jquery -->
+    <script src="https://cdn.bootcdn.net/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <!-- bootstrap -->
+    <script src="./static/bootstrap-3.3.7-dist/js/bootstrap.min.js"></script>
+    <!-- momentjs -->
+    <script src="https://cdn.bootcdn.net/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+    <!-- loader -->
+    <script src="./static/jd/js/loader.js?v=1.0.4"></script>
+
+    <script type="text/javascript" src="./static/jd/js/common.js?v=1.0.4"></script>
+    <script type="text/javascript" src="./static/jd/js/auth-api.js?v=1.0.4"></script>
+
+    <script type="text/javascript">
+        window.isEnabledAutoTask = location.href.indexOf('isEnabledAutoTask=true') > -1; //是否保存登录信息，并一个月内每天自动执行脚本
+        // window.history.pushState(null, null, 'index.html'); // url指向首页
+
+        function redirect() {
+            window.location = 'user-verif.html';
+        }
+
+        var totalBean = 0; //京豆
+        var totalSteel = 0; //钢镚
+        var totalGold = 0; //金贴
+        var totalCash = 0; //现金红包
+        var apiBegintime = new Date();
+        var allActionList = [
+            ['DoGameBySpeedUp']
+            // //京豆
+            // ['DoSignBean', 'DoSignSupermarket', 'DoSignWebcasts', 'DoSignLotteryDraw', 'DoSignShake'],
+            // ['DoSignFlashSale', 'DoSignLuckyLottery', 'DoSignJingRongDoll', 'DoSignShop', 'DoGameBySpeedUp'],
+            // //钢镚
+            // ['DoSignRongSteel'],
+            // //金贴
+            // ['DoOpenScreenReward', 'DoSignSubsidy'],
+            // //现金红包
+            // ['DoSignCash', 'DoSignGetCash', 'DoSignSecKilling']
+        ]; //分组调用
+        var iActionDown = 0; //已执行完毕的计数
+        $(function() {
+            loader.show({
+                text: '程序正在执行中，请勿关闭页面...'
+            });
+            for (let i = 0; i < allActionList.length; i++) {
+                setTimeout(function() {
+                    doAction(allActionList[i]);
+                }, 1000 * 0.2);
+            }
+            // //用户设置了自动执行脚本时显示提示信息
+            // if (window.isEnabledAutoTask) $('#taskTip').show();
+            $('#expLoginTime').text(moment(new Date(localStorage.JD_Api_Access_Cookies_Expires)).format('YYYY-MM-DD'));
+            $('#lastLoginTime').text(moment(new Date(localStorage.JD_Api_Access_Cookies_LoginTime)).format('YYYY-MM-DD'));
+        })
+
+        // 领京豆
+        function doAction(actionList) {
+            api.DailyTask.DoAction(actionList).done(function(apiRes) {
+                console.info('apiRes', apiRes)
+                iActionDown++;
+                var errMsg = '';
+                if (apiRes.code >= 0) {
+                    var data = apiRes.data;
+                    // console.info('data', data);
+                    $.each(data, function(idx, row) {
+                        var $li = $('<li></li>');
+                        if (row.success) {
+                            var awardTypeStr;
+                            var awardCount = row.awardCount || 0;
+                            if (row.awardType == 0) {
+                                totalBean += awardCount;
+                                awardTypeStr = '京豆';
+                            } else if (row.awardType == 1) {
+                                totalSteel += awardCount;
+                                awardTypeStr = '钢镚';
+                            } else if (row.awardType == 2) {
+                                totalGold += awardCount;
+                                awardTypeStr = '金贴';
+                            } else if (row.awardType == 3) {
+                                totalCash += awardCount;
+                                awardTypeStr = '现金红包';
+                            }
+                            $li.css('color', 'seagreen').text(`[${row.actionName}] ${row.awardCount || 'xx'} ${awardTypeStr}`);
+
+                        } else
+                            $li.css('color', 'brown').text(`[${row.actionName}] ${row.errMsg}`);
+                        $('#detailResult').append($li);
+                    })
+                    $('#txtTotalBean').text(totalBean);
+                    $('#txtTotalSteel').text(totalSteel.toFixed(2));
+                    $('#txtTotalGold').text(totalGold.toFixed(2));
+                    $('#txtTotalCash').text(totalCash.toFixed(2));
+                    $('#txtTimes').text(moment().diff(apiBegintime, 's'));
+                    if (data.length > 5) scrollToBottom();
+                } else {
+                    //alert('请求接口失败：' + apiRes.message);
+                    errMsg += apiRes.message + '<br>';
+                }
+                //
+                var isEnd = allActionList.length == iActionDown;
+                if (isEnd) {
+                    var _html = '';
+                    _html += '<span class="glyphicon glyphicon-grain"></span> 程序执行完毕，成功领取：<br><span class="glyphicon glyphicon-menu-right" style="font-size:12px; padding-left:2px;"></span> ';
+                    //_html += `京豆 <span style="font-weight:bold;">${totalBean}</span> 个，`;
+                    _html += ` <span class="label label-warning">京豆 ${totalBean}</span> `;
+                    //_html += `钢镚 <span style="font-weight:bold;">${totalSteel}</span>，`;
+                    _html += ` <span class="label label-info">钢镚 ${totalSteel.toFixed(2)}</span> `;
+                    //_html += `金贴 <span style="font-weight:bold;">${totalGold}</span>，`;
+                    _html += ` <span class="label label-danger">金贴 ${totalGold.toFixed(2)}</span> `;
+                    //_html += `现金红包 <span style="font-weight:bold;">${totalCash}</span>`;
+                    _html += ` <span class="label label-default label-hongbao">红包 ${totalCash.toFixed(2)}</span> `;
+                    $('#topResult').html(_html);
+                    //用户设置了自动执行脚本时显示提示信息
+                    if (window.isEnabledAutoTask) $('#taskTip').show();
+                    //显示失败原因
+                    if (errMsg) $('#err').show().find('p').html(errMsg);
+                    loader.hide();
+                }
+            })
+        }
+
+        // 滚动到底部
+        function scrollToBottom() {
+            $('html,body').animate({
+                scrollTop: $(document).height()
+            }, 1000 * 0.1);
+        }
+    </script>
+</head>
+
+<body>
+    <div>
+        <div class="t1" style="position: fixed; width:100%; background-color:#fff; opacity: 0.9; height:105px; box-shadow: 1px 2px 5px #eee;">
+            <h3 style="margin: 5px 0;">
+                京东自动领金豆
+                <!-- <img style="padding-bottom: 5px; width: 16px;" src="https://m.360buyimg.com/njmobilecms/jfs/t23077/281/1785113494/12232/1b2c8fe2/5b699736N9a079de0.png" /> -->
+                <span class="glyphicon glyphicon-info-sign" style="font-size:0.8em;color:#aaa;" aria-hidden="true" data-toggle="modal" data-target="#myModal"></span>
+            </h3>
+            <p id="topResult" style="color:green;"></p>
+        </div>
+        <div style="padding-top: 110px;">
+            <ul id="detailResult" style="padding:0 15px 0 30px;">
+                <!-- <li>京东商城-京豆签到成功: 2京豆</li> -->
+            </ul>
+            <div class="t1" style="color:#666;display: none;" id="err">
+                <h4>操作返回失败：</h4>
+                <p style="color:lightcoral;"></p>
+            </div>
+            <div class="t1" style="color:#666;display: none;">
+                <h4>结果汇总，领取到：</h4>
+                <p><span id="txtTotalBean">--</span> 京豆</p>
+                <p><span id="txtTotalSteel">--</span> 钢镚</p>
+                <p><span id="txtTotalGold">--</span> 金贴</p>
+                <p><span id="txtTotalCash">--</span> 现金红包</p>
+                <p>耗时：<span id="txtTimes">--</span> s</p>
+            </div>
+        </div>
+        <div id="taskTip" style="display: none;">
+            <div class="t1" style="color:#a9a9a9;">
+                <h4>注意：</h4>
+                <div style="text-indent: 2em;">
+                    <p>你已设置保存登录信息，并一个月内每天自动执行脚本</p>
+                    <p>即在 <span id="lastLoginTime">2021/02/03</span> ~ <span id="expLoginTime">2021/03/03</span> 系统会自动帮你执行脚本，不用你手动执行，<span style="font-weight:bold;">但过期后需要重新手动执行一次脚本</span></p>
+                    <p>每天的执行结果可在首页查看，如需取消自动执行，可到首页设置</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 说明 -->
+    <div class="modal fade" id="myModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+        <div class="modal-dialog modal-sm" role="document" style="margin-top:120px;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    <h4 class="modal-title" id="myModalLabel">说明</h4>
+                </div>
+                <div class="modal-body">
+                    <p><span class="glyphicon glyphicon-menu-right" aria-hidden="true"></span> 当前脚本功能包含：领取京豆、钢镚、金贴、现金红包。</p>
+                    <p><span class="glyphicon glyphicon-menu-right" aria-hidden="true"></span> 京豆、钢镚、金贴、现金红包 均有有效期限制，即会过期，注意使用。</p>
+                    <p><span class="glyphicon glyphicon-menu-right" aria-hidden="true"></span> 当前脚本只需每天执行一次即可，不用频繁重复地执行。</p>
+                    <p><span class="glyphicon glyphicon-menu-right" aria-hidden="true"></span> 如果执行结果中出现如“xx京豆”，这是表示京东那边未返回具体的京豆数值，所以用xx代替。</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+
+</html>
